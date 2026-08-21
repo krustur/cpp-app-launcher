@@ -1,0 +1,4 @@
+#include "resource.h"
+
+IDR_FALLBACK_MANIFEST RCDATA "fallback_manifest.json"
+IDR_FALLBACK_CONFIG RCDATA "fallback_config.json"

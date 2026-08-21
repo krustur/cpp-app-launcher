@@ -1,0 +1,4 @@
+#pragma once
+
+#define IDR_FALLBACK_MANIFEST 101
+#define IDR_FALLBACK_CONFIG 102
