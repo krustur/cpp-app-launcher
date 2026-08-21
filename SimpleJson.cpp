@@ -123,7 +123,7 @@ bool ReadInt(const std::string& text, size_t* index, int* value,
   }
 
   try {
-    long parsed = std::stol(text.substr(start, *index - start));
+    long long parsed = std::stoll(text.substr(start, *index - start));
     if (parsed < std::numeric_limits<int>::min() ||
         parsed > std::numeric_limits<int>::max()) {
       if (error_message != nullptr) {

@@ -192,12 +192,13 @@ bool ReadFileBytes(const std::wstring& path, std::vector<BYTE>* bytes) {
   }
 
   bytes->assign(static_cast<size_t>(size.QuadPart), 0);
-  DWORD total_read = 0;
+  size_t total_read = 0;
   while (total_read < bytes->size()) {
     DWORD chunk_read = 0;
+    DWORD requested = static_cast<DWORD>(
+        std::min<size_t>(bytes->size() - total_read, MAXDWORD));
     if (ReadFile(handle, bytes->data() + total_read,
-                 static_cast<DWORD>(bytes->size() - total_read), &chunk_read,
-                 nullptr) == FALSE) {
+                 requested, &chunk_read, nullptr) == FALSE) {
       CloseHandle(handle);
       return false;
     }
@@ -236,8 +237,9 @@ bool WriteBytesToFile(const std::wstring& path, const BYTE* data, size_t size) {
   size_t total_written = 0;
   while (total_written < size) {
     DWORD chunk_written = 0;
-    if (WriteFile(handle, data + total_written,
-                  static_cast<DWORD>(size - total_written), &chunk_written,
+    DWORD requested =
+        static_cast<DWORD>(std::min<size_t>(size - total_written, MAXDWORD));
+    if (WriteFile(handle, data + total_written, requested, &chunk_written,
                   nullptr) == FALSE) {
       CloseHandle(handle);
       return false;
@@ -271,9 +273,8 @@ bool HashFile(const std::wstring& path, ULONGLONG* hash) {
   return true;
 }
 
-bool HashText(const std::string& text, ULONGLONG* hash) {
+void HashText(const std::string& text, ULONGLONG* hash) {
   *hash = HashBytes(reinterpret_cast<const BYTE*>(text.data()), text.size());
-  return true;
 }
 
 std::wstring GetErrorMessage(DWORD error_code) {
@@ -536,8 +537,12 @@ bool WriteTextOrReturnTrueIfUnchanged(const std::string& text,
     ULONGLONG new_hash = 0;
     ULONGLONG existing_hash = 0;
     std::string existing_text;
-    if (HashText(text, &new_hash) && ReadFileTextUtf8(destination_path, &existing_text) &&
-        HashText(existing_text, &existing_hash) && new_hash == existing_hash) {
+    HashText(text, &new_hash);
+    bool read_existing = ReadFileTextUtf8(destination_path, &existing_text);
+    if (read_existing) {
+      HashText(existing_text, &existing_hash);
+    }
+    if (read_existing && new_hash == existing_hash) {
       return true;
     }
   }
@@ -679,7 +684,7 @@ bool ArchiveVersionIfNeeded(const LauncherSettings& settings, const SourceBundle
     if (VerifyArchivedVersion(source, archive_directory)) {
       return true;
     }
-    *error_code = ERROR_ALREADY_EXISTS;
+    *error_code = ERROR_FILE_CORRUPT;
     return false;
   }
 
@@ -738,9 +743,12 @@ bool BackupInstalledConfigIfPresent(const InstalledVersionInfo& installed,
   ULONGLONG current_hash = 0;
   ULONGLONG new_hash = 0;
   std::string current_config_text;
-  if (ReadFileTextUtf8(installed.config_path, &current_config_text) &&
-      HashText(current_config_text, &current_hash) &&
-      HashText(new_config_text, &new_hash) && current_hash != new_hash) {
+  bool read_existing = ReadFileTextUtf8(installed.config_path, &current_config_text);
+  if (read_existing) {
+    HashText(current_config_text, &current_hash);
+    HashText(new_config_text, &new_hash);
+  }
+  if (read_existing && current_hash != new_hash) {
     *notify_difference = true;
   }
   return true;
